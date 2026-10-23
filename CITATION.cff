@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "Cayley Embedding Workbench"
+message: "If you use this software or the census dataset, please cite it."
+type: software
+authors:
+  - family-names: "Fokam Souop"
+    given-names: "Rigobert"
+    affiliation: "Laboratory of Energy, Signal, Imaging and Automation (LESIA), National School of Agro-Industrial Sciences, University of Ngaoundere, Cameroon"
+  - family-names: "Bitjoka"
+    given-names: "Laurent"
+    affiliation: "Laboratory of Energy, Signal, Imaging and Automation (LESIA), National School of Agro-Industrial Sciences, University of Ngaoundere, Cameroon"
+abstract: >-
+  A browser-based workbench for embedding a graph into a Cayley graph of a
+  finite abelian group. It reports certified bounds for the three embedding
+  routes - completion, isometric and induced - computes the completion cost
+  exactly up to eleven vertices, and carries a census of all 995 connected
+  graphs on two to seven vertices with their exact completion costs.
+keywords:
+  - graph embedding
+  - Cayley graph
+  - abelian group
+  - graph signal processing
+  - graph theory
+license: MIT
+repository-code: "https://github.com/ge-gsp/cayley-embedding"
+url: "https://ge-gsp.github.io/cayley-embedding/"
+version: "0.1.0"
+date-released: "2026-10-23"
