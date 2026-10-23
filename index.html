@@ -712,29 +712,86 @@ function render(G,r,known){
     r.exact ? `<span class="cost lin">exact</span>` : `<span class="cost lin">O(n+m)</span>`,
     gHow]);
 
-  let nuCell;
-  if(known?.nu) nuCell = known.nu[0]===known.nu[1]
-      ? `<span class="exact">${known.nu[0]}</span> <span class="note">${known.nu[2]}</span>`
-      : `${known.nu[0]} … ${known.nu[1]} <span class="note">${known.nu[2]}</span>`;
-  else if(r.closed.nu) nuCell = `<span class="exact">${r.closed.nu}</span> <span class="note">closed form</span>`;
-  else nuCell = `${r.nuLo??"—"} … 2<sup>${r.nuHi}</sup>`;
-  rows.push(["Isometric ν", nuCell,
-    `<span class="cost">Θ(nm)</span>`,
-    "Floor max(n, 2·diam) needs a BFS from every vertex. Preserves all distances."]);
+  /* The two routes are not independent.  Every isometric embedding is also an
+     induced one - preserving all distances preserves d = 1 in both directions -
+     so eta <= nu for every graph.  A floor on eta is therefore a floor on nu,
+     and a ceiling on nu is a ceiling on eta.  Each bound is computed on its own
+     below and then sharpened by that relation; without this the table can show
+     a weaker bound than it already holds. */
+  const n=r.n;
+  const cayley = !!(r.exact && r.exact.gp===0);
 
-  const floors=[r.etaCount, r.etaCountReg, r.etaLocal].filter(x=>x!=null);
-  const eLo=Math.ceil(Math.max(...floors));
-  let etaCell;
-  if(known?.eta) etaCell = known.eta[0]===known.eta[1]
+  const floors=[n].concat([r.etaCount,r.etaLocal].filter(x=>x!=null));
+  /* 2n - 2m/(D+1) holds only for a regular G that is NOT itself an abelian
+     Cayley graph, so it may be used only once gamma+ has decided that:
+     gamma+ = 0 exactly when G is one. */
+  const regApplies = r.etaCountReg!=null && !!r.exact && r.exact.gp>0;
+  if(regApplies) floors.push(r.etaCountReg);
+  const eLoOwn = Math.ceil(Math.max.apply(null,floors));
+  const nuHiVal = n<=40 ? Math.pow(2,n-1) : Infinity;
+
+  const etaLoOwn = known?.eta ? known.eta[0] : (r.closed.eta!=null?r.closed.eta:eLoOwn);
+  const etaHiOwn = known?.eta ? known.eta[1] : (r.closed.eta!=null?r.closed.eta:r.etaHi);
+  const nuLoOwn  = known?.nu  ? known.nu[0]  : (r.closed.nu!=null ?r.closed.nu :(r.nuLo??n));
+  const nuHiOwn  = known?.nu  ? known.nu[1]  : (r.closed.nu!=null ?r.closed.nu :nuHiVal);
+
+  const nuLo  = Math.max(nuLoOwn, etaLoOwn);      // eta <= nu
+  const etaHi = Math.min(etaHiOwn, nuHiOwn);      // eta <= nu
+  const nuRaised  = nuLo  > nuLoOwn;
+  const etaLowered= etaHi < etaHiOwn;
+  const showHi = x => x===Infinity ? `2<sup>${n-1}</sup>`
+                    : (x>4096 ? `2<sup>${n-1}</sup>` : String(x));
+
+  let nuCell, nuHow;
+  if(cayley){
+    nuCell=`<span class="exact">${n}</span> <span class="note">G itself</span>`;
+    nuHow ="Exact. γ⁺ = 0, so G already is a Cayley graph of an abelian "+
+           "group on its own vertices: the identity map is an isometric embedding, "+
+           "and no host can be smaller than n.";
+  } else if(known?.nu){
+    nuCell = known.nu[0]===known.nu[1]
+      ? `<span class="exact">${known.nu[0]}</span> <span class="note">${known.nu[2]}</span>`
+      : `${nuLo} … ${known.nu[1]} <span class="note">${known.nu[2]}</span>`;
+    nuHow = "From the dissertation.";
+  } else if(r.closed.nu!=null){
+    nuCell=`<span class="exact">${r.closed.nu}</span> <span class="note">closed form</span>`;
+    nuHow ="Closed form, Prop. 4.11. Preserves all distances.";
+  } else {
+    nuCell=`${nuLo} … ${showHi(nuHiOwn)}`;
+    nuHow ="Floor max(n, 2·diam) needs a BFS from every vertex" +
+      (nuRaised ? `, giving ${nuLoOwn}; raised to ${nuLo} because η ≤ ν `+
+                  `and the induced floor is ${etaLoOwn}` : "") +
+      ". Preserves all distances.";
+  }
+  rows.push(["Isometric ν", nuCell,
+    cayley?`<span class="cost lin">exact</span>`:`<span class="cost">Θ(nm)</span>`, nuHow]);
+
+  let etaCell, etaHow;
+  if(cayley){
+    etaCell=`<span class="exact">${n}</span> <span class="note">G itself</span>`;
+    etaHow ="Exact, for the same reason as ν: G is already an abelian Cayley "+
+            "graph, and η ≥ n for any injective map.";
+  } else if(known?.eta){
+    etaCell = known.eta[0]===known.eta[1]
       ? `<span class="exact">${known.eta[0]}</span> <span class="note">${known.eta[2]}</span>`
-      : `${known.eta[0]} … ${known.eta[1]}`;
-  else if(r.closed.eta) etaCell = `<span class="exact">${r.closed.eta}</span> <span class="note">closed form</span>`;
-  else etaCell = `${eLo} … ${r.etaHi}`;
+      : `${known.eta[0]} … ${etaHi}`;
+    etaHow = "From the dissertation.";
+  } else if(r.closed.eta!=null){
+    etaCell=`<span class="exact">${r.closed.eta}</span> <span class="note">closed form</span>`;
+    etaHow ="Closed form, Ch. 3.";
+  } else {
+    etaCell=`${eLoOwn} … ${showHi(etaHi)}`;
+    etaHow = `Counting floor 2n−2m/Δ = ${fmt(r.etaCount)}` +
+      (r.etaCountReg!=null
+        ? (regApplies
+            ? `, and 2n−2m/(Δ+1) = ${fmt(r.etaCountReg)}, which applies because γ⁺ > 0 proves G is not itself an abelian Cayley graph`
+            : `; 2n−2m/(Δ+1) = ${fmt(r.etaCountReg)} is not used, as it needs G not to be an abelian Cayley graph and that is not settled here`)
+        : "") +
+      (r.etaLocal!=null?`; local order floor ${r.etaLocal} <span class="cost hard">NP-hard in Δ</span>`:"") +
+      (etaLowered?`. Ceiling ${showHi(etaHiOwn)} from Babai–Sós, cut to ${showHi(etaHi)} because η ≤ ν`:"") + ".";
+  }
   rows.push(["Induced η", etaCell,
-    `<span class="cost lin">O(n+m)</span>`,
-    `Counting floor 2n−2m/Δ = ${fmt(r.etaCount)}` +
-    (r.etaCountReg!=null?`, and 2n−2m/(Δ+1) = ${fmt(r.etaCountReg)} if G is not itself an abelian Cayley graph`:"") +
-    (r.etaLocal!=null?`; local order floor ${r.etaLocal} <span class="cost hard">NP-hard in Δ</span>`:"") + "."]);
+    cayley?`<span class="cost lin">exact</span>`:`<span class="cost lin">O(n+m)</span>`, etaHow]);
 
   $("bounds").innerHTML =
     `<thead><tr><th>Route</th><th>Bracket</th><th>Screen</th><th>How it is obtained</th></tr></thead><tbody>`+
